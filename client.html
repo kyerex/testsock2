@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>HTML-Terminal</title>
+
+<script>
+function init()
+{
+	sock = new WebSocket("ws://127.0.0.1:5001/");
+
+	sock.onclose = function(e) {
+		console.log("Web Socket closed");
+	};
+
+	sock.onopen = function (e){
+        console.log("web Socket open");
+    };
+    
+    sock.onmessage=function (e){
+		var m = e.data;
+        var s;
+
+        if (m.substr(0,4) == "!!!!") {
+            sock.close();
+            return;
+        }
+        m="<P>"+m+"</p>";
+        document.write(m);
+
+        s="got it\0";
+        sock.send(s);
+	}
+
+};
+
+</script>
+
+</head>
+
+<body onload="init();">
+
+
+
+
+</body>
+</html>
