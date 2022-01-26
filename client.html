@@ -6,7 +6,7 @@
 <script>
 function init()
 {
-	sock = new WebSocket("ws://127.0.0.1:5001/");
+	sock = new WebSocket("ws://192.168.1.72:5001/");
 
 	sock.onclose = function(e) {
 		console.log("Web Socket closed");
