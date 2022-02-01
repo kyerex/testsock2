@@ -1,9 +1,12 @@
+
 /*
 Sock2 is an upgrade from Sock 
 It adds has 3 types of lengths/protocols
 1. SHORTLEN - netshort prefixs all data
 2. LONGLEN - netlong prefixs all data
 3. WEBSOCK - Websock protocol prefixes data
+and a user HTML connection
+4. HTMLSOCK - the user handles this connection htmlttyd does a Single Page App get
 
 Once connectted the data transfer:
 put,get and getwait are identical
@@ -14,6 +17,7 @@ The class provide server side for SHORTLEN, LONGLEN and WEBSOCK
 and client side for SHORTLEN and LONGLEN.
 A javascript WEBSOCK client side is required for client side WEBSOCK connection.
 */
+
 #ifndef SOCK2_H_INCLUDED
 #define SOCK2_H_INCLUDED
 
@@ -39,14 +43,17 @@ A javascript WEBSOCK client side is required for client side WEBSOCK connection.
 #define GETERR WSAGetLastError()
 #endif
 
-#define SHORTLEN 0
-#define LONGLEN 1
-#define WEBSOCK 2
+#define NOTDEFINED 0
+#define SHORTLEN 1
+#define LONGLEN 2
+#define WEBSOCK 3
+#define HTMLSOCK 4
 
 class Sock2{
 
 public:
     enum SockRet{CLOSED,NOT_READY,ERR,READY};
+    int st;
 
 private:
 #ifdef TGOSWIN32
@@ -60,25 +67,25 @@ private:
     int offset;
     unsigned char *buffer;
     enum {INVALID,READING,SERVING}state;
-    int st;
     uint32_t mlength;
 
-    void DoHandShake(); //Server side  handshake after accept
     void DoCHandShake(); //Client side  handshake after accept
     enum SockRet put_len(uint32_t dlen);
-    enum SockRet put_data(char *data,uint32_t dlen);
     enum SockRet get_datax(char *d,uint32_t l);
     enum SockRet get_data(char *rdata, uint32_t rlen);
     enum SockRet get_len(uint32_t *dlen);
-    enum SockRet waitsock(int tim);
     void apply_mask(char *obp,uint32_t len);
 
 public:
     SOCKET fd;
+    char hsbuf[2048]; //used by handshake left for caller on HTMLSOCK
 
     Sock2();
     ~Sock2();
 
+    enum SockRet waitsock(int tim);
+    void DoHandShake(); //Server side  handshake after accept
+    enum SockRet put_data(char *data,uint32_t dlen); // let client handle html connection
     void open(const char *host,int port);
     void open(const char *host,int port,int t);
     void open(const char *host,int port,int t,uint32_t m);

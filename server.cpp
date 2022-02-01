@@ -38,6 +38,7 @@ int main(int argc,char *argv[])
     int i;
     fd_set readset;
     char buf[4096];
+    char tbuf[1024];
     char *d;
     uint32_t len;
 
@@ -82,6 +83,28 @@ int main(int argc,char *argv[])
     break;
     }
     s.close();
+    c.DoHandShake();
+    if (c.st == HTMLSOCK) {
+        // Sock2 saved the request header in hsbuf 
+        if (memcmp(c.hsbuf,"GET / HTTP/1.1\r\n",16) != 0) {
+            slog->info("Only know 1 page to server up");
+        }
+        else {
+        // you cannot do a put must use put data
+            strcpy(buf,"<!DOCTYPE html><head></head><body><H1>Hello World</h1></body>");
+            sprintf(tbuf,"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %u\r\n\r\n",
+                            (uint32_t)strlen(buf));
+            c.put_data(tbuf,strlen(tbuf));
+            c.put_data(buf,strlen(buf));
+#ifdef TGOSLINUX
+            sleep(3);
+#else
+            Sleep(3000);
+#endif
+        }
+        c.close();
+        return 0;
+    }
     for (i=0;i!=100;++i) {
         memset(buf,'A',200);
         buf[199]='\n';

@@ -1,9 +1,7 @@
 #include "gsys.h"
 #include "Sock2.h"
 #include "do.h"
-#ifdef LOG_ON
 #include "ServerLog.h"
-#endif
 #include <stdio.h>
 extern "C" {
 #ifdef TGOSLINUX
@@ -77,9 +75,7 @@ int Sock2::cleanup ()
 }
 #endif
 
-#ifdef LOG_ON
 extern ServerLog *slog;
-#endif
 
 Sock2::~Sock2()
 {
@@ -92,6 +88,7 @@ Sock2::~Sock2()
 Sock2::Sock2()
 {
     fd=INVALID_SOCKET;
+    st=NOTDEFINED;
     buffer=NULL;
 #ifdef TGOSWIN32
     startup();
@@ -155,10 +152,8 @@ void Sock2::open(const char *host,int port,int t,uint32_t m)
 
     addr.sin_port = htons(port);
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-#ifdef LOG_ON
         slog->abort("Sock2::open(char *host,int port) "
                     "Error return from socket(AF_INET, SOCK_STREAM, 0)");
-#endif
         fd=INVALID_SOCKET;
         return;
     }
@@ -187,23 +182,19 @@ void Sock2::open(const char *host,int port,int t,uint32_t m)
                 }
                 closesocket(fd);
                 fd=INVALID_SOCKET;
-#ifdef LOG_ON
                 slog->abort("Sock2::open(char *host,int port,int sizeof_len) "
                             "Error return from(10 retries): "
                             "connect(fd, (struct sockaddr *)&addr, "
                 "sizeof(addr)");
-#endif
                 return;
             }
             else {
                 closesocket(fd);
                 fd=INVALID_SOCKET;
-#ifdef LOG_ON
                 slog->abort("Sock2::open(char *host,int port,int sizeof_len) "
                             "Error return from "
                             "connect(fd, (struct sockaddr *)&addr, "
                 "sizeof(addr)");
-#endif
                 return;
             }
         }
@@ -238,10 +229,8 @@ void Sock2::open(int port,char *inter)
 
     if ((inaddr = inet_addr(inter)) == INADDR_NONE) {
         fd=INVALID_SOCKET;
-#ifdef LOG_ON
         slog->abort("Sock2::open(int port,int sizeof_len,char *inter) "
                     "error return from inet_addr(inter) - bad interface name");
-#endif
         return;
     }
     open(port, inaddr);
@@ -258,10 +247,8 @@ void Sock2::open(int port,unsigned int sadd)
     addr.sin_port = htons(port);
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         fd=INVALID_SOCKET;
-#ifdef LOG_ON
         slog->abort("Sock2::open(int port,int sizeof_len,unsigned long sadd) "
                     "error return from socket(AF_INET, SOCK_STREAM, 0)");
-#endif
         return;
     }
     
@@ -276,11 +263,9 @@ void Sock2::open(int port,unsigned int sadd)
     if ( 0 != bind(fd,(struct sockaddr *)&addr,sizeof(addr)) ) {
         closesocket(fd);
         fd=INVALID_SOCKET;
-#ifdef LOG_ON
         slog->abort("Sock2::open(int port,int sizeof_len,unsigned long sadd) "
                     "error return from bind(fd,(struct sockaddr *)&addr,"
             "sizeof(addr))");
-#endif
         return;
     }
     buffer=NULL;
@@ -311,20 +296,16 @@ void Sock2::open(const Sock2 &s)
 
     fd=INVALID_SOCKET;
     if (s.fd == INVALID_SOCKET || s.state != SERVING) {
-#ifdef LOG_ON
         slog->abort("Sock2::open(const Sock &s) "
                     "attempt to accept call from now serving object");
-#endif
         return;
     }
     fromlen=sizeof(from);
     fd=accept(s.fd,(struct sockaddr *)&from,&fromlen);
     if (INVALID_SOCKET == fd) {
-#ifdef LOG_ON
         slog->error("Sock2::open(const Sock &s) "
                     "error return from accept(s.fd,(struct sockaddr *)"
             "&from,&fromlen))");
-#endif
         return;
     }
     // set to non-blocking
@@ -339,7 +320,6 @@ void Sock2::open(const Sock2 &s)
     length = 0;
     offset = 0;
     state  = INVALID;
-    DoHandShake();
     return;
 }
 
@@ -392,10 +372,8 @@ enum Sock2::SockRet Sock2::get_data(char *rdata, uint32_t rlen)
     int n;
 
     if (fd < 0) {
-#ifdef LOG_ON
         slog->abort("Sock2::getdata(char *rdata, int *rdlen) "
                 "Sock object not open");
-#endif
         return(ERR);
     }
     if (state == INVALID) {
@@ -417,11 +395,9 @@ enum Sock2::SockRet Sock2::get_data(char *rdata, uint32_t rlen)
                 if (err == EWOULDBLOCK || err == EINTR) {
                     return(NOT_READY);
                 }
-#ifdef LOG_ON
                 slog->error("Sock2::getdata(char *rdata, int *rdlen) "
                              "error returned "
                              "from recv(fd, (char *)&buffer[offset], length,0)");
-#endif
                 state=INVALID;
                 return ERR;
             }
@@ -433,10 +409,8 @@ enum Sock2::SockRet Sock2::get_data(char *rdata, uint32_t rlen)
         return READY;
     }
     state = INVALID;
-#ifdef LOG_ON
     slog->abort("Sock::getdata(char *rdata, int *rdlen) "
                 "logic error can't be here");
-#endif
     return ERR;
 }    // Sock2::get_data
 
@@ -468,6 +442,9 @@ enum Sock2::SockRet Sock2::waitsock(int tim)
 
 enum Sock2::SockRet Sock2::getwait(char **data, uint32_t *len,int tim)
 {
+    if (st == HTMLSOCK) {
+        return NOT_READY;
+    }
     if (READY != waitsock(tim)) {
         return NOT_READY;
     }
@@ -478,6 +455,9 @@ enum Sock2::SockRet Sock2::get(char **data, uint32_t *len)
 {
     enum SockRet ret;
 
+    if (st == HTMLSOCK) {
+        return NOT_READY;
+    }
     *data=NULL;
     if (READY != get_len(len)){ //assume full length is avaiable
         slog->info("Error on Get len\n");
@@ -516,10 +496,8 @@ enum Sock2::SockRet Sock2::put_data(char *data,uint32_t dlen)
     int wait_time=10000; // Give up time slot 10000 times on stalled output
 
     if (fd < 0) {
-#ifdef LOG_ON
         slog->abort("Sock2::put(const unsigned short *data) "
                     "Sock object not open");
-#endif
         return(ERR);
     }
     len=(int)dlen;
@@ -540,10 +518,8 @@ enum Sock2::SockRet Sock2::put_data(char *data,uint32_t dlen)
                 --wait_time;
                 continue;;
             }
-#ifdef LOG_ON
             slog->error("Sock2::put(const unsigned short *data) "
                         "error return send(fd, (char *)&wbuf[offset], len,0)");
-#endif
             return(ERR); // lost connection
         }
         len    -= n;
@@ -554,59 +530,50 @@ enum Sock2::SockRet Sock2::put_data(char *data,uint32_t dlen)
 
 const char *connected="connected";
 
+// should be called by child
 void Sock2::DoHandShake()
 {
-    char buf[2048];
     char key[2048];
     char *bp;
     int n,len;
 
-    //pend 5 up to seconds
-    if (READY != waitsock(5)){
-bad_handshake:
-        close();
-#ifdef LOG_ON
-        slog->error((char *)"Hand Shake error aborting connection");
-#endif
-        return;
-    }
-    bp=buf;n=1;
+    st=NOTDEFINED; // should already be NOTDEFINED
+    bp=hsbuf;n=1;
     if (READY != get_datax(bp,1)) {
-        goto bad_handshake;
+        return;
     }
     if (*bp == 'S' || *bp == 'L'){
         while (*bp != '\0') {
             ++bp;++n;
-            if (n==2048) {
-                goto bad_handshake;
+           if (n==2048) {
+                return;;
             }
             if (READY != get_datax(bp,1)) {
-                goto bad_handshake;
+                return;
             }
         }
     }
     else {
         if (READY != get_datax(bp+1,31)) {
-            goto bad_handshake;
+            return;
         }
-        bp=&buf[32];n=32;
-        while (memcmp(&buf[n-4],"\r\n\r\n",4) !=0 ) {
+        bp=&hsbuf[32];n=32;
+        while (memcmp(&hsbuf[n-4],"\r\n\r\n",4) !=0 ) {
             if (READY != get_datax(bp,1)) {
-                goto bad_handshake;
+                return;
             }
             ++bp;++n;
             if (n==2048) {
-                goto bad_handshake;
+                return;
             }
         }
-
     }
-    if (n>4 && buf[n-1] == '\0') {
+    if (n>4 && hsbuf[n-1] == '\0') {
         len=-1; // check for LONG or SHORT handshake
-        if (memcmp(buf,"SHORT",5) == 0) {
+        if (memcmp(hsbuf,"SHORT",5) == 0) {
             st=SHORTLEN;
-            if (n > 5 && buf[5] == ',') {
-                len=atoi(&buf[6]);
+            if (n > 5 && hsbuf[5] == ',') {
+                len=atoi(&hsbuf[6]);
                 if (len < 128 || len >65535) {
                     len=65535;
                 }
@@ -616,10 +583,10 @@ bad_handshake:
 
             }
         }
-        if (memcmp(buf,"LONG",4) == 0) {
+        if (memcmp(hsbuf,"LONG",4) == 0) {
             st=LONGLEN;
-            if (n > 4 && buf[4] == ',') {
-                len=atoi(&buf[5]);
+            if (n > 4 && hsbuf[4] == ',') {
+                len=atoi(&hsbuf[5]);
                 if (len < 128 || len >16777215) {
                     len=16777215;
                 }
@@ -631,44 +598,50 @@ bad_handshake:
         }
         if ( len != -1) {
             mlength=(uint32_t)len;
-            strcpy(buf,connected);
-            len=strlen(buf)+1;
-            n = send(fd,buf,len,0);
+            strcpy(hsbuf,connected);
+            len=strlen(hsbuf)+1;
+            n = send(fd,hsbuf,len,0);
             if (n != (int)len) {
-                goto bad_handshake;
+                st=NOTDEFINED;
             }
             return;
         } // else fall thru to check for websock handshake
     }
+    hsbuf[n]='\0';
     if (n < 32) {
-        goto bad_handshake;
+        return;
     }
-    buf[n]='\0';
-    if (memcmp(buf,"GET",3) != 0) goto bad_handshake;
-    if (memcmp(&buf[n-4],"\r\n\r\n",4) !=0 ) goto bad_handshake;
-    if (strstr (buf,"Upgrade: websocket") == 0) goto bad_handshake;
-    if (strstr (buf,"Connection: Upgrade") == 0) goto bad_handshake;
-    if (strstr (buf,"Sec-WebSocket-Version: 13") == 0) goto bad_handshake;
-    if ((bp=strstr (buf,"Sec-WebSocket-Key:")) == 0) goto bad_handshake;
+    if (strstr (hsbuf,"Upgrade: websocket") == 0) {
+        if (memcmp(hsbuf,"GET /",4) == 0) {
+            st=HTMLSOCK;
+            mlength=16777215;
+        }
+        //st="NOTDEFINED"
+        return;
+    }
+    if (memcmp(hsbuf,"GET / HTTP/1.1\r\n",16) != 0) return;
+    if (strstr (hsbuf,"Connection: Upgrade") == 0) return;
+    if (strstr (hsbuf,"Sec-WebSocket-Version: 13") == 0) return;
+    if ((bp=strstr (hsbuf,"Sec-WebSocket-Key:")) == 0) return;
     strcpy(key,bp+18);
     bp=key;while (*bp==' ')++bp;
-    strcpy(buf,bp);
-    bp=buf;while(*bp > ' ')++bp;
+    strcpy(hsbuf,bp);
+    bp=hsbuf;while(*bp > ' ')++bp;
     *bp='\0';
-    strcpy(key,buf);
+    strcpy(key,hsbuf);
     strcat(key,(char *)"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-    do_sha1 (key,(unsigned int)strlen(key),buf);
-    do_hta64((byt *)buf,20,(byt *)key,(lwrd *)&len);
+    do_sha1 (key,(unsigned int)strlen(key),hsbuf);
+    do_hta64((byt *)hsbuf,20,(byt *)key,(uint32_t *)&len);
     key[len]='\0';
-    strcpy(buf,"HTTP/1.1 101 Switching Protocols\r\n");
-    strcat(buf,"Upgrade: websocket\r\n");
-    strcat(buf,"Connection: Upgrade\r\n");
-    strcat(buf,"Sec-WebSocket-Accept: ");
-    strcat(buf,key);
-    strcat(buf,"\r\n\r\n");
-    len=(unsigned int)strlen(buf);
-    n = send(fd,buf,len,0);
-    if (n != (int)len) goto bad_handshake;
+    strcpy(hsbuf,"HTTP/1.1 101 Switching Protocols\r\n");
+    strcat(hsbuf,"Upgrade: websocket\r\n");
+    strcat(hsbuf,"Connection: Upgrade\r\n");
+    strcat(hsbuf,"Sec-WebSocket-Accept: ");
+    strcat(hsbuf,key);
+    strcat(hsbuf,"\r\n\r\n");
+    len=(unsigned int)strlen(hsbuf);
+    n = send(fd,hsbuf,len,0);
+    if (n != (int)len) return;
     st=WEBSOCK;
     mlength=16777215;
 }
@@ -689,9 +662,7 @@ void Sock2::DoCHandShake()
     if (n != (int)len) {
 bad_chandshake:
         close();
-#ifdef LOG_ON
         slog->error((char *)"Client Hand Shake error aborting connection");
-#endif
         return;
     }
     //pend 5 seconds
@@ -715,10 +686,8 @@ enum Sock2::SockRet Sock2::put_len(uint32_t dlen)
     unsigned char *bp,*bp2;
 
     if (dlen > mlength) {
-#ifdef LOG_ON
         slog->error("Sock2::SockRet Sock2::put_len(uint32_t dlen)"
                         "Data Len greater than mlength");
-#endif
         return ERR;
     }
     s=htons((unsigned short)dlen);
@@ -759,6 +728,13 @@ enum Sock2::SockRet Sock2::put_len(uint32_t dlen)
                 }
             }
             return put_data(tbuf,(char *)bp-tbuf);
+
+        default:
+            // HTMLSOCK handles len elsewhere
+            slog->info("enum Sock2::SockRet Sock2::put_len(uint32_t dlen) "
+                "logic error can't be here");
+            return NOT_READY;
+
     }
     return READY;
 }
@@ -833,6 +809,10 @@ enum Sock2::SockRet Sock2::get_len(uint32_t *dlen)
             mask[3]=tbuf[3];
             *dlen=len;
             return READY;
+        default:
+            slog->abort("Sock2::get_len(uint32_t *dlen) "
+                "logic error can't be here");
+            // no return
     }
     return READY;
 }
