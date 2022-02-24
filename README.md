@@ -28,3 +28,11 @@ The websock is tested by bring up client.html
 
 The 2 and 4 byte len are tested with the client executable (modify client.cpp to change len).
 Note that the Sock2 class handles the client side of these 2 connections.
+
+all code is mine except in do.cpp base64 encoding from: https://github.com/zhicheng/base64 /* This is a public domain base64 implementation written by WEI Zhicheng. */
+
+and sha-1 encoding from: https://gist.github.com/jrabbit/1042021 /* ================ sha1.c ================ / / SHA-1 in C By Steve Reid steve@edmweb.com 100% Public Domain */
+
+so I think it should be okay to use in an MIT license - I'm new to the open source licensing
+
+Thanks Ken Yerex
