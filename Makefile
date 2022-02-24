@@ -1,6 +1,6 @@
 CC=	gcc
 CPP=	g++
-CPPFLAGS= -g $(OPTIMIZE) -Wall -I.
+CPPFLAGS= -g -O -Wall -I.
 
 
 OBJS=	ServerLog.o \
@@ -9,7 +9,7 @@ OBJS=	ServerLog.o \
 	server.o\
 	client.o
 
-ifeq ($(MSYS),msys)
+ifeq ($(OS),Windows_NT)
 LIBS2=-lws2_32
 STATIC=-static
 else
