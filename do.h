@@ -1,13 +1,14 @@
 
 #ifndef DO_INCLUDED
 #define DO_INCLUDED
+#include <inttypes.h>
 
 #include "gsys.h"
 
-void do_hta64(byt*, lwrd, byt*, lwrd*);
-void do_ath64(byt*, lwrd, byt*, lwrd*);
-lwrd getulen(byt *bpx,lwrd lenx);
-int get_lwrd(byt **bpx,lwrd *lenx, lwrd *resx);
+void do_hta64(byt*, uint32_t, byt*, uint32_t*);
+void do_ath64(byt*, uint32_t, byt*, uint32_t*);
+uint32_t getulen(byt *bpx,uint32_t lenx);
+int get_uint32_t(byt **bpx,uint32_t *lenx, uint32_t *resx);
 
 /* ================ sha1.h ================ */
 /*
